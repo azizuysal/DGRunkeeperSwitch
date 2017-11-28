@@ -105,6 +105,8 @@ open class DGRunkeeperSwitch: UIControl {
     fileprivate var panGesture: UIPanGestureRecognizer!
     
     fileprivate var initialSelectedBackgroundViewFrame: CGRect?
+  
+    private var selectedBackgroundViewFrame: NSKeyValueObservation?
     
     // MARK: - Constructors
     
@@ -158,8 +160,12 @@ open class DGRunkeeperSwitch: UIControl {
         panGesture = UIPanGestureRecognizer(target: self, action: #selector(pan))
         panGesture.delegate = self
         addGestureRecognizer(panGesture)
-        
-        addObserver(self, forKeyPath: "selectedBackgroundView.frame", options: .new, context: nil)
+      
+        selectedBackgroundViewFrame = selectedBackgroundView.observe(\.frame, options: NSKeyValueObservingOptions.new) { [weak self] (object, changes) in
+            if let newValue = changes.newValue {
+                self?.titleMaskView.frame = newValue
+            }
+        }
     }
     
     override open func awakeFromNib() {
@@ -168,33 +174,19 @@ open class DGRunkeeperSwitch: UIControl {
         self.titleFont = UIFont(name: self.titleFontFamily, size: self.titleFontSize)
     }
     
-    // MARK: - Destructor
-    
-    deinit {
-        removeObserver(self, forKeyPath: "selectedBackgroundView.frame")
-    }
-    
-    // MARK: - Observer
-    
-    override open func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
-        if keyPath == "selectedBackgroundView.frame" {
-            titleMaskView.frame = selectedBackgroundView.frame
-        }
-    }
-    
     // MARK: -
     
     override open class var layerClass : AnyClass {
         return DGRunkeeperSwitchRoundedLayer.self
     }
     
-    func tapped(_ gesture: UITapGestureRecognizer!) {
+    @objc func tapped(_ gesture: UITapGestureRecognizer!) {
         let location = gesture.location(in: self)
         let index = Int(location.x / (bounds.width / CGFloat(titleLabels.count)))
         setSelectedIndex(index, animated: true)
     }
     
-    func pan(_ gesture: UIPanGestureRecognizer!) {
+    @objc func pan(_ gesture: UIPanGestureRecognizer!) {
         if gesture.state == .began {
             initialSelectedBackgroundViewFrame = selectedBackgroundView.frame
         } else if gesture.state == .changed {
@@ -235,8 +227,9 @@ open class DGRunkeeperSwitch: UIControl {
     
     override open func layoutSubviews() {
         super.layoutSubviews()
-        
-        let selectedBackgroundWidth = bounds.width / CGFloat(titleLabels.count) - selectedBackgroundInset * 2.0
+      
+        let labelsCount = CGFloat(titleLabels.count) > 0 ? CGFloat(titleLabels.count) : 1
+        let selectedBackgroundWidth = bounds.width / labelsCount - selectedBackgroundInset * 2.0
         selectedBackgroundView.frame = CGRect(x: selectedBackgroundInset + CGFloat(selectedIndex) * (selectedBackgroundWidth + selectedBackgroundInset * 2.0), y: selectedBackgroundInset, width: selectedBackgroundWidth, height: bounds.height - selectedBackgroundInset * 2.0)
         
         (titleLabelsContentView.frame, selectedTitleLabelsContentView.frame) = (bounds, bounds)
